@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10243d">
+<title>MuseScore Touch – prototyp</title>
+<style>
+:root{--navy:#10243d;--blue:#1976d2;--pale:#eaf2fb;--line:#d8e0e9;--ink:#182536;--muted:#607086}
+*{box-sizing:border-box}body{margin:0;background:#eef2f6;color:var(--ink);font:15px system-ui,-apple-system,"Segoe UI",sans-serif}
+header{height:58px;background:var(--navy);color:white;display:flex;align-items:center;gap:18px;padding:0 16px;position:sticky;top:0;z-index:5}
+.brand{font-size:20px;font-weight:700;white-space:nowrap}.brand span{color:#62b5ff}
+button,select,input{font:inherit}button{border:1px solid var(--line);background:white;border-radius:8px;padding:9px 12px;color:var(--ink);cursor:pointer}button:active{transform:translateY(1px)}button.primary,.active{background:var(--blue);color:white;border-color:var(--blue)}
+.top-actions{display:flex;gap:7px;margin-left:auto;flex-wrap:wrap}
+.tabs{display:flex;gap:4px;padding:8px 12px;background:white;border-bottom:1px solid var(--line);overflow:auto}
+.tabs button{border:0;background:transparent;white-space:nowrap}.tabs button.active{background:var(--pale);color:var(--blue)}
+.toolbar{display:flex;gap:6px;align-items:center;padding:9px 12px;background:#f9fbfd;border-bottom:1px solid var(--line);overflow:auto}
+.toolbar button{min-width:62px}.toolbar small{display:block;color:var(--muted);font-size:11px}
+.workspace{display:grid;grid-template-columns:185px minmax(380px,1fr) 310px;gap:10px;padding:10px;align-items:start}
+.panel,.score-panel{background:white;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.panel h3{font-size:15px;margin:0;padding:13px;border-bottom:1px solid var(--line)}
+.panel-body{padding:12px}.instrument{display:block;width:100%;text-align:left;margin:4px 0}.instrument.selected{background:var(--pale);border-color:#9cc9f4;color:#075ca8}
+.score-head{padding:15px 20px 0;text-align:center}.score-head h2{font: bold 25px Georgia,serif;margin:0}.score-head p{margin:5px;color:var(--muted)}
+.score-scroll{overflow:auto;padding:8px 14px 18px}
+#score{display:block;width:100%;min-width:650px;height:auto;background:white;touch-action:pan-x pan-y}
+.hint{font-size:12px;color:var(--muted);padding:0 16px 12px}
+.right .panel{margin-bottom:10px}.video-frame{width:100%;aspect-ratio:16/9;background:#101820;border:0;border-radius:7px}
+input[type=text]{width:100%;padding:9px;border:1px solid var(--line);border-radius:7px}
+.controls{display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap}.controls input[type=range]{min-width:80px;flex:1}
+.keyboard-wrap{position:sticky;bottom:0;background:#e9eef4;border-top:1px solid #cbd5e1;padding:8px 10px max(10px,env(safe-area-inset-bottom));z-index:4}
+.keybar{display:flex;align-items:center;gap:10px;margin-bottom:7px;overflow:auto}.keybar strong{white-space:nowrap}.keybar button{white-space:nowrap}
+.keyboard{height:132px;display:flex;position:relative;overflow-x:auto;overflow-y:hidden;background:#cbd5df;border:1px solid #8493a5;border-radius:7px;touch-action:pan-x}
+.white-key{position:relative;flex:0 0 42px;height:100%;background:linear-gradient(#fff,#f5f7fa);border:1px solid #9aa6b4;border-radius:0 0 5px 5px;display:flex;align-items:end;justify-content:center;padding-bottom:6px;color:#657184;font-size:11px;z-index:1}
+.black-key{position:absolute;top:0;left:29px;width:25px;height:76px;background:linear-gradient(90deg,#17202b,#05080c);border:1px solid #000;border-radius:0 0 4px 4px;z-index:2;box-shadow:0 2px 3px #777}
+.white-key.pressed,.black-key.pressed{background:#75baff}
+footer{font-size:11px;color:var(--muted);text-align:center;padding:10px}
+@media(max-width:900px){.workspace{grid-template-columns:145px minmax(330px,1fr)}.right{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px}.right .panel{margin:0}}
+@media(max-width:650px){header{height:auto;min-height:54px;flex-wrap:wrap;padding:8px}.brand{font-size:17px}.top-actions{margin-left:0}.workspace{display:flex;flex-direction:column;padding:7px}.left,.score-panel,.right{width:100%}.left{display:none}.right{display:flex;flex-direction:column}.score-head h2{font-size:21px}.toolbar{padding:7px}.keyboard{height:116px}.white-key{flex-basis:35px}.black-key{left:24px;width:21px;height:67px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">♫ MuseScore <span>Touch</span></div>
+  <div class="top-actions">
+    <button onclick="newScore()">Nová</button><button onclick="saveScore()">Uložit</button>
+    <button onclick="exportJSON()">Export</button><button onclick="document.getElementById('fileIn').click()">Otevřít</button>
+    <input id="fileIn" type="file" accept=".json,application/json" hidden onchange="importJSON(event)">
+  </div>
+</header>
+<nav class="tabs">
+  <button class="active">Noty</button><button onclick="setTool('note')">Vkládání</button><button onclick="setTool('erase')">Mazání</button><button onclick="toggleKeyboard()">Klaviatura</button><button onclick="toggleVideo()">YouTube</button>
+</nav>
+<div class="toolbar">
+  <button class="active" id="tool-note" onclick="setTool('note')">♪<small>Nota</small></button>
+  <button onclick="setDuration(4)">𝅝<small>Celá</small></button><button onclick="setDuration(2)">𝅗𝅥<small>Půlová</small></button>
+  <button onclick="setDuration(1)">♩<small>Čtvrťová</small></button><button onclick="setDuration(.5)">♪<small>Osminová</small></button>
+  <button onclick="setTool('erase')" id="tool-erase">⌫<small>Guma</small></button>
+  <label style="margin-left:8px">Takt
+    <select id="meter" onchange="drawScore()"><option value="4/4">4/4</option><option value="3/4">3/4</option><option value="2/4">2/4</option><option value="6/8">6/8</option></select>
+  </label>
+  <label>Tempo <input id="tempo" type="number" value="100" min="30" max="240" style="width:65px;padding:7px;border:1px solid #d8e0e9;border-radius:7px"> BPM</label>
+</div>
+<main class="workspace">
+  <aside class="panel left">
+    <h3>Nástroje</h3><div class="panel-body">
+      <button class="instrument selected" onclick="selectInstrument(this,'Klavír')">♬ Klavír</button>
+      <button class="instrument" onclick="selectInstrument(this,'Housle')">♩ Housle</button>
+      <button class="instrument" onclick="selectInstrument(this,'Flétna')">♬ Flétna</button>
+      <button class="instrument" onclick="selectInstrument(this,'Kytara')">♬ Kytara</button>
+      <button class="instrument" onclick="selectInstrument(this,'Bicí')">♩ Bicí</button>
+      <button class="instrument" onclick="selectInstrument(this,'Saxofon')">♬ Saxofon</button>
+      <p style="font-size:12px;color:#607086">Vybraný nástroj: <b id="instrumentName">Klavír</b></p>
+    </div>
+  </aside>
+  <section class="score-panel">
+    <div class="score-head"><h2 id="scoreTitle">Moje skladba</h2><p>Notový zápis · kliknutím na osnovu vložíš notu</p></div>
+    <div class="score-scroll"><svg id="score" viewBox="0 0 900 470" role="img" aria-label="Notová osnova"></svg></div>
+    <div class="hint">Prototyp: vyber délku noty a klepni do osnovy. Noty lze vybrat a odstranit nástrojem Guma. Pokročilé rytmické a notační funkce budou následovat.</div>
+  </section>
+  <aside class="right">
+    <section class="panel video-panel">
+      <h3>YouTube – doprovod</h3><div class="panel-body">
+        <input type="text" id="ytUrl" placeholder="Vlož odkaz na YouTube">
+        <div class="controls"><button class="primary" onclick="loadYoutube()">Načíst video</button><span style="font-size:11px;color:#607086">Video se zobrazí zde</span></div>
+        <div style="margin-top:10px"><iframe id="ytFrame" class="video-frame" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen title="YouTube video"></iframe></div>
+      </div>
+    </section>
+    <section class="panel">
+      <h3>Přehrávání a nastavení</h3><div class="panel-body">
+        <div class="controls"><button class="primary" onclick="playSequence()">▶ Přehrát noty</button><button onclick="stopSequence()">■ Stop</button></div>
+        <div class="controls"><label><input type="checkbox" id="metronome"> Metronom</label></div>
+        <div class="controls"><label>Hlasitost</label><input id="volume" type="range" min="0" max="1" step=".05" value=".45"></div>
+        <div class="controls"><label>Transpozice</label><select id="transpose"><option value="0">0 půltónů</option><option value="2">+2</option><option value="-2">−2</option><option value="5">+5</option><option value="-5">−5</option><option value="12">+12</option></select></div>
+      </div>
+    </section>
+  </aside>
+</main>
+<section class="keyboard-wrap" id="keyboardWrap">
+  <div class="keybar"><strong>Virtuální klaviatura</strong><button onclick="changeOctave(-1)">−</button><span>Oktáva <b id="octaveLabel">4</b></span><button onclick="changeOctave(1)">+</button><button id="sustain" onclick="this.classList.toggle('active')">Sustain</button><span style="font-size:12px;color:#607086">Klepnutím vložíš notu do partitury</span></div>
+  <div class="keyboard" id="keyboard"></div>
+</section>
+<footer>MuseScore Touch · raný funkční prototyp · data se zatím ukládají v tomto prohlížeči</footer>
+<script>
+const NS='http://www.w3.org/2000/svg';let notes=[],duration=1,tool='note',octave=4,instrument='Klavír',audioCtx=null,activeOsc=[],keyboardVisible=true,videoVisible=true;
+const names=['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','H'];
+function midiName(m){return names[(m%12+12)%12]+(Math.floor(m/12)-1)}
+function setTool(t){tool=t;document.getElementById('tool-note').classList.toggle('active',t==='note');document.getElementById('tool-erase').classList.toggle('active',t==='erase')}
+function setDuration(d){duration=d;document.querySelectorAll('.toolbar button').forEach(b=>b.classList.remove('active'))}
+function selectInstrument(el,n){document.querySelectorAll('.instrument').forEach(x=>x.classList.remove('selected'));el.classList.add('selected');instrument=n;document.getElementById('instrumentName').textContent=n}
+function newScore(){if(confirm('Opravdu vytvořit novou skladbu?')){notes=[];drawScore()}}
+function toggleKeyboard(){keyboardVisible=!keyboardVisible;document.getElementById('keyboardWrap').style.display=keyboardVisible?'block':'none'}
+function toggleVideo(){videoVisible=!videoVisible;document.querySelector('.video-panel').style.display=videoVisible?'block':'none'}
+function changeOctave(d){octave=Math.max(1,Math.min(7,octave+d));document.getElementById('octaveLabel').textContent=octave;buildKeyboard()}
+function svgEl(tag,attrs,parent){let e=document.createElementNS(NS,tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));parent.appendChild(e);return e}
+function drawScore(){
+ const s=document.getElementById('score');s.innerHTML='';
+ const title=svgEl('text',{x:450,y:24,'text-anchor':'middle','font-size':1,fill:'white'},s);
+ for(let system=0;system<2;system++){
+  let top=65+system*205;
+  for(let l=0;l<5;l++)svgEl('line',{x1:55,y1:top+l*10,x2:850,y2:top+l*10,stroke:'#202b38','stroke-width':1.2},s);
+  svgEl('text',{x:12,y:top+28,'font-size':35,fill:'#111'},s).textContent='𝄞';
+  svgEl('text',{x:47,y:top+17,'font-size':14,fill:'#111'},s).textContent=document.getElementById('meter').value;
+  svgEl('line',{x1:55,y1:top-3,x2:55,y2:top+43,stroke:'#111','stroke-width':2},s);
+  for(let b=1;b<=4;b++)svgEl('line',{x1:55+b*190,y1:top-2,x2:55+b*190,y2:top+43,stroke:'#333','stroke-width':1},s);
+ }
+ notes.forEach((n,i)=>drawNote(s,n,i));
+ s.onclick=e=>{if(e.target.dataset.note!==undefined){if(tool==='erase'){notes.splice(+e.target.dataset.note,1);drawScore()}return}let p=s.createSVGPoint();p.x=e.clientX;p.y=e.clientY;let q=p.matrixTransform(s.getScreenCTM().inverse());let system=q.y>245?1:0,top=65+system*205;let step=Math.round((top+40-q.y)/5);let midi=76+step;addNote(midi,Math.max(60,Math.min(850,q.x)),system)};
+}
+function drawNote(s,n,i){let top=65+n.system*205;let y=top+40-(n.midi-76)*5;let g=svgEl('g',{'data-note':i,style:'cursor:pointer'},s);if(y<top-7||y>top+50)return;
+ if(n.midi%2===0)svgEl('line',{x1:n.x-9,y1:y+5,x2:n.x+9,y2:y+5,stroke:'#111','stroke-width':1},g);
+ svgEl('ellipse',{cx:n.x,cy:y,rx:6.5,ry:4.3,transform:`rotate(-18 ${n.x} ${y})`,fill:n.duration>=2?'white':'#111',stroke:'#111','stroke-width':1.2},g);
+ if(n.duration<4)svgEl('line',{x1:n.x+6,y1:y,x2:n.x+6,y2:y-34,stroke:'#111','stroke-width':1.5},g);
+ if(n.duration<=.5)svgEl('path',{d:`M ${n.x+6} ${y-34} q 13 7 1 17`,fill:'none',stroke:'#111','stroke-width':1.5},g);
+ g.addEventListener('click',e=>{e.stopPropagation();if(tool==='erase'){notes.splice(i,1);drawScore()}});
+}
+function addNote(midi,x,system=0){notes.push({midi,x,system,duration});drawScore()}
+function buildKeyboard(){let k=document.getElementById('keyboard');k.innerHTML='';let start=(octave+1)*12;for(let i=0;i<24;i++){let m=start+i,white=[0,2,4,5,7,9,11].includes(m%12);if(white){let key=document.createElement('div');key.className='white-key';key.textContent=(m%12===0?'C'+(Math.floor(m/12)-1):'');key.onclick=()=>{addNote(m,120+notes.length*23,notes.length>18?1:0);playMidi(m,key)};let next=(m+1)%12;if([0,2,5,7,9].includes(m%12)){let black=document.createElement('div');black.className='black-key';black.onclick=e=>{e.stopPropagation();let bm=m+1;addNote(bm,120+notes.length*23,notes.length>18?1:0);playMidi(bm,black)};key.appendChild(black)}k.appendChild(key)}}}
+function playMidi(m,key){try{if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();let o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='triangle';o.frequency.value=440*Math.pow(2,(m-69)/12);g.gain.value=Number(document.getElementById('volume').value)*.12;o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+.35);key.classList.add('pressed');setTimeout(()=>key.classList.remove('pressed'),180)}catch(e){alert('Zvuk není v tomto prohlížeči dostupný.')}}
+let playTimer=null;function playSequence(){stopSequence();let idx=0;let tempo=Math.max(30,Math.min(240,+document.getElementById('tempo').value||100));let ordered=[...notes].sort((a,b)=>a.system-b.system||a.x-b.x);function tick(){if(idx>=ordered.length){stopSequence();return}let n=ordered[idx++];playMidi(n.midi,document.body);playTimer=setTimeout(tick,60000/tempo*n.duration)}tick()}
+function stopSequence(){if(playTimer)clearTimeout(playTimer);playTimer=null}
+function videoId(url){try{let u=new URL(url);if(u.hostname.includes('youtu.be'))return u.pathname.slice(1);if(u.searchParams.get('v'))return u.searchParams.get('v');if(u.pathname.includes('/embed/'))return u.pathname.split('/embed/')[1].split('/')[0]}catch(e){}return ''}
+function loadYoutube(){let id=videoId(document.getElementById('ytUrl').value.trim());if(!id){alert('Zadej platný odkaz na YouTube.');return}document.getElementById('ytFrame').src='https://www.youtube-nocookie.com/embed/'+encodeURIComponent(id)+'?rel=0'}
+function saveScore(){localStorage.setItem('museTouchScore',JSON.stringify({notes,meter:document.getElementById('meter').value,tempo:document.getElementById('tempo').value,title:document.getElementById('scoreTitle').textContent}));alert('Skladba uložena v tomto prohlížeči.')}
+function exportJSON(){let data={app:'MuseScore Touch prototype',version:1,notes,meter:document.getElementById('meter').value,tempo:document.getElementById('tempo').value,title:document.getElementById('scoreTitle').textContent};let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='moje-skladba.json';a.click();URL.revokeObjectURL(a.href)}
+function importJSON(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let d=JSON.parse(r.result);notes=d.notes||[];if(d.meter)document.getElementById('meter').value=d.meter;if(d.tempo)document.getElementById('tempo').value=d.tempo;if(d.title)document.getElementById('scoreTitle').textContent=d.title;drawScore()}catch(err){alert('Soubor se nepodařilo načíst.')}};r.readAsText(f)}
+drawScore();buildKeyboard();
+</script>
+</body>
+</html>
